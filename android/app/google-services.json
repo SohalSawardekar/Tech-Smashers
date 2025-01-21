@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "103870058423",
+    "project_id": "tech-smash-61498",
+    "storage_bucket": "tech-smash-61498.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:103870058423:android:29ce92143733bf10212232",
+        "android_client_info": {
+          "package_name": "com.example.tech_smash"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCvvvWLv98-uOJTGGLWxe4PhKtWx2mA68I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
