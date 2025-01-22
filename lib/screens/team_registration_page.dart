@@ -19,6 +19,7 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
   late AnimationController _controller;
   final TextEditingController teamController = TextEditingController();
   String error = '';
+  bool isTeamRegistered = false;
 
   @override
   void initState() {
@@ -63,10 +64,7 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
       currentTeam?.players.add(player);
       if ((currentTeam?.players.length ?? 0) == 6) {
         if (_validateTeam()) {
-          _saveTeamToDatabase(currentTeam!);
-          teams.add(currentTeam!);
-          currentTeam = null;
-          teamController.clear();
+          _showSubmitDialog();
         } else {
           _showErrorDialog('Team must have at least one female player');
           currentTeam?.players.removeLast();
@@ -75,10 +73,61 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
     });
   }
 
+  void _showSubmitDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text('Submit Team', style: TextStyle(color: Colors.teal)),
+        content: const Text('Are you sure you want to submit this team?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.teal),
+            onPressed: () {
+              Navigator.pop(context); // Close the dialog
+              _saveTeamWithLoadingIndicator(
+                  currentTeam!); // Show loading and save
+            },
+            child: const Text('Submit'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _saveTeamWithLoadingIndicator(TeamModel team) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevent closing while loading
+      builder: (context) => const Center(
+        child: CircularProgressIndicator(color: Colors.teal),
+      ),
+    );
+
+    try {
+      await _firestoreService.addTeam(team); // Save the team
+      Navigator.pop(context); // Close the loading indicator
+      _showSuccessDialog(); // Show success dialog
+      setState(() {
+        isTeamRegistered = true;
+      });
+    } catch (e) {
+      Navigator.pop(context); // Close the loading indicator
+      _showErrorDialog('Error saving team to database: $e');
+    }
+  }
+
   void _saveTeamToDatabase(TeamModel team) async {
     try {
       await _firestoreService.addTeam(team);
       _showSuccessDialog();
+      setState(() {
+        isTeamRegistered = true;
+      });
     } catch (e) {
       _showErrorDialog('Error saving team to database: $e');
     }
@@ -149,15 +198,25 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
                   ),
                   items: [
                     'Captain',
-                    'Forward',
-                    'Defender',
-                    'Midfielder',
-                    'Goalkeeper',
+                    'player',
                     'Substitute',
-                  ]
-                      .map((role) =>
-                          DropdownMenuItem(value: role, child: Text(role)))
-                      .toList(),
+                  ].map((role) {
+                    bool isDisabled = role == 'Captain' &&
+                        (currentTeam?.players
+                                .any((player) => player.role == 'Captain') ??
+                            false);
+
+                    return DropdownMenuItem<String>(
+                      value: isDisabled ? null : role,
+                      enabled: !isDisabled,
+                      child: Text(
+                        role,
+                        style: TextStyle(
+                          color: isDisabled ? Colors.grey : Colors.black,
+                        ),
+                      ),
+                    );
+                  }).toList(),
                   onChanged: (value) {
                     setState(() => selectedRole = value);
                   },
@@ -195,6 +254,9 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
                   numberController.dispose();
                   if ((currentTeam?.players.length ?? 0) < 6) {
                     _showAddPlayerDialog();
+                  } else {
+                    Navigator.pop(context);
+                    _showSubmitDialog();
                   }
                 }
               },
@@ -347,7 +409,7 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
                     ),
 
                     // Current Team Section
-                    if (currentTeam != null) ...[
+                    if (isTeamRegistered) ...[
                       const SizedBox(height: 24),
                       Card(
                         elevation: 4,
