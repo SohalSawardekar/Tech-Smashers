@@ -1,23 +1,23 @@
-// ignore_for_file: unnecessary_to_list_in_spreads
+// ignore_for_file: library_private_types_in_public_api
 
 import 'package:flutter/material.dart';
+import 'package:tech_smash/models/teamModel.dart';
+import 'package:tech_smash/services/firestore_service.dart';
 
 class TeamRegistrationPage extends StatefulWidget {
   const TeamRegistrationPage({super.key});
 
   @override
-  // ignore: library_private_types_in_public_api
   _TeamRegistrationPageState createState() => _TeamRegistrationPageState();
 }
 
 class _TeamRegistrationPageState extends State<TeamRegistrationPage>
     with SingleTickerProviderStateMixin {
-  final List<Team> teams = [];
+  final FirestoreService _firestoreService = FirestoreService();
+  final List<TeamModel> teams = [];
+  TeamModel? currentTeam;
   late AnimationController _controller;
-
   final TextEditingController teamController = TextEditingController();
-
-  Team? currentTeam;
   String error = '';
 
   @override
@@ -43,31 +43,45 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
     }
 
     setState(() {
-      currentTeam = Team(name: teamController.text);
+      currentTeam = TeamModel(
+        name: teamController.text,
+        players: [],
+      );
       error = '';
     });
     _showAddPlayerDialog();
   }
 
+  bool _validateTeam() {
+    return currentTeam?.players
+            .any((player) => player.gender == Gender.female) ??
+        false;
+  }
+
   void _addPlayerToTeam(Player player) {
     setState(() {
-      currentTeam!.players.add(player);
-      if (currentTeam!.players.length == 6) {
+      currentTeam?.players.add(player);
+      if ((currentTeam?.players.length ?? 0) == 6) {
         if (_validateTeam()) {
+          _saveTeamToDatabase(currentTeam!);
           teams.add(currentTeam!);
           currentTeam = null;
           teamController.clear();
-          _showSuccessDialog();
         } else {
           _showErrorDialog('Team must have at least one female player');
-          currentTeam!.players.removeLast();
+          currentTeam?.players.removeLast();
         }
       }
     });
   }
 
-  bool _validateTeam() {
-    return currentTeam!.players.any((player) => player.gender == Gender.female);
+  void _saveTeamToDatabase(TeamModel team) async {
+    try {
+      await _firestoreService.addTeam(team);
+      _showSuccessDialog();
+    } catch (e) {
+      _showErrorDialog('Error saving team to database: $e');
+    }
   }
 
   void _showAddPlayerDialog() {
@@ -83,7 +97,7 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
           title: Text(
-            'Add Player ${currentTeam!.players.length + 1}/6',
+            'Add Player ${(currentTeam?.players.length ?? 0) + 1}/6',
             style: TextStyle(color: Colors.teal.shade700),
           ),
           content: SingleChildScrollView(
@@ -118,8 +132,7 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
                   items: Gender.values.map((gender) {
                     return DropdownMenuItem(
                       value: gender,
-                      child:
-                          Text(gender.toString().split('.').last.toUpperCase()),
+                      child: Text(gender.toString().split('.').last),
                     );
                   }).toList(),
                   onChanged: (value) {
@@ -140,7 +153,7 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
                     'Defender',
                     'Midfielder',
                     'Goalkeeper',
-                    'Substitute'
+                    'Substitute',
                   ]
                       .map((role) =>
                           DropdownMenuItem(value: role, child: Text(role)))
@@ -154,7 +167,11 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                Navigator.pop(context);
+                playerNameController.dispose();
+                numberController.dispose();
+              },
               child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
             ),
             ElevatedButton(
@@ -171,10 +188,12 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
                     number: int.parse(numberController.text),
                     gender: selectedGender,
                     role: selectedRole ?? 'Player',
-                    isCaptain: currentTeam!.players.isEmpty,
+                    isCaptain: currentTeam?.players.isEmpty ?? false,
                   ));
                   Navigator.pop(context);
-                  if (currentTeam!.players.length < 6) {
+                  playerNameController.dispose();
+                  numberController.dispose();
+                  if ((currentTeam?.players.length ?? 0) < 6) {
                     _showAddPlayerDialog();
                   }
                 }
@@ -183,24 +202,6 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-        title: const Text('Success!', style: TextStyle(color: Colors.green)),
-        content: const Text('Team has been successfully registered.'),
-        actions: [
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
-            onPressed: () => Navigator.pop(context),
-            child: const Text('OK'),
-          ),
-        ],
       ),
     );
   }
@@ -215,6 +216,24 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
         actions: [
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () => Navigator.pop(context),
+            child: const Text('OK'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showSuccessDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+        title: const Text('Success!', style: TextStyle(color: Colors.green)),
+        content: const Text('Team has been successfully registered.'),
+        actions: [
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.green),
             onPressed: () => Navigator.pop(context),
             child: const Text('OK'),
           ),
@@ -517,32 +536,4 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
       ),
     );
   }
-}
-
-enum Gender { male, female }
-
-class Player {
-  final String name;
-  final int number;
-  final Gender gender;
-  final String role;
-  final bool isCaptain;
-
-  Player({
-    required this.name,
-    required this.number,
-    required this.gender,
-    required this.role,
-    required this.isCaptain,
-  });
-}
-
-class Team {
-  final String name;
-  final List<Player> players;
-
-  Team({
-    required this.name,
-    List<Player>? players,
-  }) : players = players ?? [];
 }

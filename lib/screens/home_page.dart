@@ -178,6 +178,9 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      appBar: AppBar(
+        backgroundColor: Color.fromARGB(222, 13, 72, 161),
+      ),
       body: Stack(
         children: [
           // Background with particles

@@ -1,34 +1,69 @@
-// ignore_for_file: file_names
+// ignore_for_file: unused_import
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class TeamModel {
-  final String id;
   final String name;
-  final List<String> members; // list of user uids, for example
-  final String? createdBy; // optional: who created this team
+  final List<Player> players;
 
   TeamModel({
-    required this.id,
     required this.name,
-    required this.members,
-    this.createdBy,
-  });
-
-  factory TeamModel.fromMap(Map<String, dynamic> map, String documentId) {
-    return TeamModel(
-      id: documentId,
-      name: map['name'] ?? '',
-      members: map['members'] == null
-          ? []
-          : List<String>.from(map['members'] as List),
-      createdBy: map['createdBy'],
-    );
-  }
+    List<Player>? players,
+  }) : players = players ?? [];
 
   Map<String, dynamic> toMap() {
     return {
       'name': name,
-      'members': members,
-      'createdBy': createdBy,
+      'players': players.map((player) => player.toMap()).toList(),
     };
   }
+
+  factory TeamModel.fromMap(Map<String, dynamic> map) {
+    return TeamModel(
+      name: map['name'] ?? '',
+      players: map['players'] == null
+          ? []
+          : (map['players'] as List)
+              .map((playerMap) => Player.fromMap(playerMap))
+              .toList(),
+    );
+  }
 }
+
+class Player {
+  final String name;
+  final int number;
+  final Gender gender;
+  final String role;
+  final bool isCaptain;
+
+  Player({
+    required this.name,
+    required this.number,
+    required this.gender,
+    required this.role,
+    required this.isCaptain,
+  });
+
+  Map<String, dynamic> toMap() {
+    return {
+      'name': name,
+      'number': number,
+      'gender': gender.toString().split('.').last,
+      'role': role,
+      'isCaptain': isCaptain,
+    };
+  }
+
+  factory Player.fromMap(Map<String, dynamic> map) {
+    return Player(
+      name: map['name'] ?? '',
+      number: map['number'] ?? 0,
+      gender: map['gender'] == 'male' ? Gender.male : Gender.female,
+      role: map['role'] ?? '',
+      isCaptain: map['isCaptain'] ?? false,
+    );
+  }
+}
+
+enum Gender { male, female }
