@@ -32,14 +32,14 @@ class TeamModel {
 
 class Player {
   final String name;
-  final int number;
+  final int? number;
   final Gender gender;
   final String role;
   final bool isCaptain;
 
   Player({
     required this.name,
-    required this.number,
+    this.number,
     required this.gender,
     required this.role,
     required this.isCaptain,

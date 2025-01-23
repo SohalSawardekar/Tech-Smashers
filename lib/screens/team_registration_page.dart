@@ -30,6 +30,8 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
+
+    // Fetch initial data and start periodic updates
     _fetchData();
     _startPeriodicFetch();
   }
@@ -138,15 +140,13 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
   }
 
   void _fetchData() async {
-    FirestoreService firestoreService = FirestoreService();
-
     try {
-      List<TeamModel> teams = await firestoreService.getTeams();
-      for (var team in teams) {
-        print('Team: ${team.name}, Players: ${team.players.length}');
-      }
+      List<TeamModel> fetchedTeams = await _firestoreService.getTeams();
+      setState(() {
+        teams = fetchedTeams;
+      });
     } catch (e) {
-      print('Error: $e');
+      _showErrorDialog('Error fetching data: $e');
     }
   }
 
@@ -162,12 +162,13 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
   }
 
   void _startPeriodicFetch() {
-    
+    Timer.periodic(const Duration(seconds: 3), (timer) async {
+      _fetchData();
+    });
   }
 
   void _showAddPlayerDialog() {
     final playerNameController = TextEditingController();
-    final numberController = TextEditingController();
     Gender selectedGender = Gender.male;
     String? selectedRole;
 
@@ -191,16 +192,6 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
                     labelText: 'Player Name',
                     border: OutlineInputBorder(),
                     prefixIcon: Icon(Icons.person, color: Colors.teal),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                TextField(
-                  controller: numberController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'Jersey Number',
-                    border: OutlineInputBorder(),
-                    prefixIcon: Icon(Icons.tag, color: Colors.teal),
                   ),
                 ),
                 const SizedBox(height: 16),
@@ -261,7 +252,6 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
               onPressed: () {
                 Navigator.pop(context);
                 playerNameController.dispose();
-                numberController.dispose();
               },
               child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
             ),
@@ -272,18 +262,15 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
                     borderRadius: BorderRadius.circular(8)),
               ),
               onPressed: () {
-                if (playerNameController.text.isNotEmpty &&
-                    numberController.text.isNotEmpty) {
+                if (playerNameController.text.isNotEmpty) {
                   _addPlayerToTeam(Player(
                     name: playerNameController.text,
-                    number: int.parse(numberController.text),
                     gender: selectedGender,
                     role: selectedRole ?? 'Player',
                     isCaptain: currentTeam?.players.isEmpty ?? false,
                   ));
                   Navigator.pop(context);
                   playerNameController.dispose();
-                  numberController.dispose();
                   if ((currentTeam?.players.length ?? 0) < 6) {
                     _showAddPlayerDialog();
                   } else {
@@ -496,7 +483,7 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
                                           ],
                                         ),
                                         Text(
-                                          '#${player.number} - ${player.role}',
+                                          player.role,
                                           style: TextStyle(
                                             color: Colors.teal.shade600,
                                             fontSize: 12,
@@ -593,7 +580,7 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
                                                   ],
                                                 ),
                                                 Text(
-                                                  '#${player.number} - ${player.role}',
+                                                  player.role,
                                                   style: TextStyle(
                                                     color: Colors.teal.shade600,
                                                     fontSize: 12,
