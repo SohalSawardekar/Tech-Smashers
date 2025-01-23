@@ -1,4 +1,6 @@
-// ignore_for_file: library_private_types_in_public_api
+// ignore_for_file: library_private_types_in_public_api, unused_element, use_build_context_synchronously, unnecessary_to_list_in_spreads
+
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:tech_smash/models/teamModel.dart';
@@ -14,7 +16,7 @@ class TeamRegistrationPage extends StatefulWidget {
 class _TeamRegistrationPageState extends State<TeamRegistrationPage>
     with SingleTickerProviderStateMixin {
   final FirestoreService _firestoreService = FirestoreService();
-  final List<TeamModel> teams = [];
+  late List<TeamModel> teams = [];
   TeamModel? currentTeam;
   late AnimationController _controller;
   final TextEditingController teamController = TextEditingController();
@@ -28,6 +30,8 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
       duration: const Duration(milliseconds: 300),
       vsync: this,
     );
+    _fetchData();
+    _startPeriodicFetch();
   }
 
   @override
@@ -131,6 +135,34 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
     } catch (e) {
       _showErrorDialog('Error saving team to database: $e');
     }
+  }
+
+  void _fetchData() async {
+    FirestoreService firestoreService = FirestoreService();
+
+    try {
+      List<TeamModel> teams = await firestoreService.getTeams();
+      for (var team in teams) {
+        print('Team: ${team.name}, Players: ${team.players.length}');
+      }
+    } catch (e) {
+      print('Error: $e');
+    }
+  }
+
+  Future<List> streamTeams() async {
+    try {
+      final List<TeamModel> teamsData = await _firestoreService.getTeams();
+
+      return teamsData;
+    } catch (e) {
+      _showErrorDialog('Error saving team to database: $e');
+      return [];
+    }
+  }
+
+  void _startPeriodicFetch() {
+    
   }
 
   void _showAddPlayerDialog() {

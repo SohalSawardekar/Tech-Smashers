@@ -18,7 +18,7 @@ class TeamModel {
     };
   }
 
-  factory TeamModel.fromMap(Map<String, dynamic> map) {
+  factory TeamModel.fromMap(Map<String, dynamic> map, [String? id]) {
     return TeamModel(
       name: map['name'] ?? '',
       players: map['players'] == null

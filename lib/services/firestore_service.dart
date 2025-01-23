@@ -14,16 +14,18 @@ class FirestoreService {
     }
   }
 
-  // Get all teams
-  // Future<List<TeamModel>> getTeams() async {
-  //   try {
-  //     final querySnapshot = await _firestore.collection('teams').get();
-  //     return querySnapshot.docs
-  //         .map((doc) => TeamModel.fromMap(doc.data()))
-  //         .toList();
-  //   } catch (e) {
-  //     print('Error fetching teams: $e');
-  //     throw Exception('Failed to fetch teams');
-  //   }
-  // }
+  Future<List<TeamModel>> getTeams() async {
+    try {
+      // Fetch the documents from the 'teams' collection
+      final querySnapshot = await _firestore.collection('teams').get();
+
+      // Map the documents into a list of TeamModel
+      return querySnapshot.docs.map((doc) {
+        return TeamModel.fromMap(doc.data(), doc.id);
+      }).toList();
+    } catch (e) {
+      print('Error fetching teams: $e');
+      throw Exception('Failed to fetch teams');
+    }
+  }
 }
