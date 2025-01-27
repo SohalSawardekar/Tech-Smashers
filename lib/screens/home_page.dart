@@ -1,9 +1,10 @@
-// ignore_for_file: library_private_types_in_public_api, unused_import
+// ignore_for_file: library_private_types_in_public_api, unused_import, prefer_const_constructors
 
 import 'package:flutter/material.dart';
 import 'dart:math' as math;
 import 'dart:async';
 import 'package:simple_animations/simple_animations.dart';
+import 'package:tech_smash/services/auth_service.dart';
 
 class ParticlePainter extends CustomPainter {
   final List<Particle> particles;
@@ -70,6 +71,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   late Animation<double> _titleScale;
   late Animation<double> _titleGlow;
   int selectedIndex = -1;
+  final AuthService _authService = AuthService();
 
   final List<MenuOption> menuOptions = [
     MenuOption(
@@ -99,6 +101,13 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
       route: '/leaderboard',
       color: Colors.green,
       description: 'Track tournament rankings',
+    ),
+    MenuOption(
+      title: 'Score',
+      icon: Icons.countertops,
+      route: '/scoreCount',
+      color: Colors.teal,
+      description: 'Enter the scores',
     ),
   ];
 
@@ -179,7 +188,20 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: Color.fromARGB(222, 13, 72, 161),
+        backgroundColor: const Color.fromARGB(222, 13, 72, 161),
+        automaticallyImplyLeading: false,
+        actions: [
+          Padding(
+            padding: EdgeInsets.only(right: 16.0), // Add space from the right
+            child: IconButton(
+              onPressed: _authService.signOut,
+              icon: Icon(
+                Icons.logout_rounded,
+                color: Colors.white, // Set the icon color directly
+              ),
+            ),
+          ),
+        ],
       ),
       body: Stack(
         children: [
@@ -374,90 +396,4 @@ class MenuOption {
     required this.color,
     required this.description,
   });
-}
-// Add additional routes to navigate to different screens for each menu option
-
-class AppRoutes {
-  static const String register = '/register';
-  static const String schedule = '/schedule';
-  static const String score = '/score';
-  static const String leaderboard = '/leaderboard';
-}
-
-void main() {
-  runApp(const MyApp());
-}
-
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      initialRoute: '/',
-      routes: {
-        '/': (context) => const HomePage(),
-        AppRoutes.register: (context) => const TeamRegistrationScreen(),
-        AppRoutes.schedule: (context) => const MatchSchedulerScreen(),
-        AppRoutes.score: (context) => const EnterScoresScreen(),
-        AppRoutes.leaderboard: (context) => const LeaderboardScreen(),
-      },
-      theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: const Color(0xFF0d47a1),
-      ),
-    );
-  }
-}
-
-// Screen for Team Registration
-class TeamRegistrationScreen extends StatelessWidget {
-  const TeamRegistrationScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Team Registration')),
-      body: const Center(child: Text('Register your team here.')),
-    );
-  }
-}
-
-// Screen for Match Scheduler
-class MatchSchedulerScreen extends StatelessWidget {
-  const MatchSchedulerScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Match Scheduler')),
-      body: const Center(child: Text('Schedule your matches here.')),
-    );
-  }
-}
-
-// Screen for Enter Scores
-class EnterScoresScreen extends StatelessWidget {
-  const EnterScoresScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Enter Scores')),
-      body: const Center(child: Text('Enter scores for your matches.')),
-    );
-  }
-}
-
-// Screen for Leaderboard
-class LeaderboardScreen extends StatelessWidget {
-  const LeaderboardScreen({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Leaderboard')),
-      body: const Center(child: Text('View the tournament leaderboard.')),
-    );
-  }
 }

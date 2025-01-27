@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:tech_smash/screens/admin/scoreCount.dart';
 import 'package:tech_smash/screens/auth/login.dart';
 import 'package:tech_smash/widget/wrapper.dart';
 import 'screens/home_page.dart';
 import 'screens/team_registration_page.dart';
-import 'screens/match_scheduler_page.dart';
-import 'screens/score_entry_page.dart';
+import 'screens/admin/match_scheduler_page.dart';
+import 'screens/admin/score_entry_page.dart';
 import 'screens/leaderboard_page.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'config/firebase_options.dart';
@@ -41,6 +42,7 @@ class BadmintonEventApp extends StatelessWidget {
         '/schedule': (context) => const TournamentBracketPage(),
         '/score': (context) => ScoreEntryPage(),
         '/leaderboard': (context) => LeaderboardPage(),
+        '/scoreCount': (context) => const CounterPage(),
       },
     );
   }
