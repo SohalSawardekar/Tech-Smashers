@@ -11,11 +11,12 @@ class TournamentBracketPage extends StatefulWidget {
 class _TournamentBracketPageState extends State<TournamentBracketPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
+  List<Map<String, dynamic>> matches = [];
   List<String> _teams = [];
   String? _team1;
   String? _team2;
   bool isComplete = false;
-  bool isLoading = false; // Loading state for progress indicator
+  bool isLoading = false;
   final TextEditingController _matchNumberController = TextEditingController();
   final TextEditingController _roundNumberController = TextEditingController();
 
@@ -23,11 +24,12 @@ class _TournamentBracketPageState extends State<TournamentBracketPage> {
   void initState() {
     super.initState();
     _fetchTeams();
+    _fetchMatches();
   }
 
   Future<void> _fetchTeams() async {
     setState(() {
-      isLoading = true; // Start loading
+      isLoading = true; 
     });
 
     try {
@@ -43,6 +45,32 @@ class _TournamentBracketPageState extends State<TournamentBracketPage> {
     } finally {
       setState(() {
         isLoading = false; // Stop loading
+      });
+    }
+  }
+
+  Future<void> _fetchMatches() async {
+    setState(() {
+      isLoading = true; // Start loading
+    });
+
+    try {
+      final snapshot = await _firestore.collection('matches').get();
+      final List<Map<String, dynamic>> fetchedMatches = snapshot.docs
+          .map((doc) => {
+                'id': doc.id,
+                ...doc.data(),
+              })
+          .toList();
+
+      setState(() {
+        matches = fetchedMatches;
+      });
+    } catch (e) {
+      debugPrint('Error fetching matches: $e');
+    } finally {
+      setState(() {
+        isLoading = false; 
       });
     }
   }
@@ -92,6 +120,8 @@ class _TournamentBracketPageState extends State<TournamentBracketPage> {
         const SnackBar(content: Text('Match scheduled successfully!')),
       );
 
+      await _fetchMatches(); // Refresh matches after scheduling
+
       setState(() {
         _team1 = null;
         _team2 = null;
@@ -119,67 +149,111 @@ class _TournamentBracketPageState extends State<TournamentBracketPage> {
       body: SafeArea(
         child: isLoading
             ? const Center(child: CircularProgressIndicator()) // Show loader
-            : Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  children: [
-                    const Text(
-                      'Select Teams and Enter Match Number',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: _team1,
-                      hint: const Text('Select Team 1'),
-                      items: _teams
-                          .map((team) =>
-                              DropdownMenuItem(value: team, child: Text(team)))
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _team1 = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: _team2,
-                      hint: const Text('Select Team 2'),
-                      items: _teams
-                          .map((team) =>
-                              DropdownMenuItem(value: team, child: Text(team)))
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          _team2 = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _roundNumberController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Enter Round Number',
-                        border: OutlineInputBorder(),
+            : SingleChildScrollView(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    children: [
+                      const Text(
+                        'Select Teams and Enter Match Number',
+                        style: TextStyle(
+                            fontSize: 18, fontWeight: FontWeight.bold),
                       ),
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _matchNumberController,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(
-                        labelText: 'Enter Match Number',
-                        border: OutlineInputBorder(),
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: _team1,
+                        hint: const Text('Select Team 1'),
+                        items: _teams
+                            .map((team) => DropdownMenuItem(
+                                value: team, child: Text(team)))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _team1 = value;
+                          });
+                        },
                       ),
-                    ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: _scheduleMatch,
-                      child: const Text('Schedule Match'),
-                    ),
-                  ],
+                      const SizedBox(height: 16),
+                      DropdownButtonFormField<String>(
+                        value: _team2,
+                        hint: const Text('Select Team 2'),
+                        items: _teams
+                            .map((team) => DropdownMenuItem(
+                                value: team, child: Text(team)))
+                            .toList(),
+                        onChanged: (value) {
+                          setState(() {
+                            _team2 = value;
+                          });
+                        },
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _roundNumberController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Enter Round Number',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: _matchNumberController,
+                        keyboardType: TextInputType.number,
+                        decoration: const InputDecoration(
+                          labelText: 'Enter Match Number',
+                          border: OutlineInputBorder(),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: _scheduleMatch,
+                        child: const Text('Schedule Match'),
+                      ),
+                      const SizedBox(height: 24),
+                      Column(
+                        children: [
+                          const Text(
+                            'Scheduled Matches',
+                            style: TextStyle(
+                                fontSize: 18, fontWeight: FontWeight.bold),
+                          ),
+                          const SizedBox(height: 16),
+                          ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: matches.length,
+                            itemBuilder: (context, index) {
+                              final match = matches[index];
+                              final isComplete = match['isComplete'] as bool;
+                              return Card(
+                                margin: const EdgeInsets.symmetric(vertical: 4),
+                                child: ListTile(
+                                  title: Text(
+                                    '${match['team1']} vs ${match['team2']}',
+                                    style: const TextStyle(
+                                        fontWeight: FontWeight.bold),
+                                  ),
+                                  subtitle: Text(
+                                    'Round: ${match['roundNumber']}, Match: ${match['matchNumber']}',
+                                  ),
+                                  trailing: Text(
+                                    isComplete ? 'Completed' : 'Pending',
+                                    style: TextStyle(
+                                      color: isComplete
+                                          ? Colors.green
+                                          : Colors.red, // Red or Green
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
               ),
       ),

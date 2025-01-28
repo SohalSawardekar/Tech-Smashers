@@ -87,6 +87,10 @@ class _ScoreEntryPageState extends State<ScoreEntryPage> {
           'team1Score': int.tryParse(set3Team1Controller.text) ?? 0,
           'team2Score': int.tryParse(set3Team2Controller.text) ?? 0,
         },
+        'winner': {
+          'teamName': "",
+          'score': 0,
+        },
         'isComplete': true, // Mark the match as complete
       };
 

@@ -192,12 +192,16 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
         automaticallyImplyLeading: false,
         actions: [
           Padding(
-            padding: EdgeInsets.only(right: 16.0), // Add space from the right
+            padding: EdgeInsets.only(right: 16.0),
             child: IconButton(
-              onPressed: _authService.signOut,
+              onPressed: () async {
+                await _authService.signOut();
+                Navigator.of(context).pop();
+                Navigator.of(context).pushReplacementNamed('/login');
+              },
               icon: Icon(
                 Icons.logout_rounded,
-                color: Colors.white, // Set the icon color directly
+                color: Colors.white,
               ),
             ),
           ),
