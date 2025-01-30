@@ -128,29 +128,28 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 16),
 
                 // Google Sign-In Button
-                ElevatedButton.icon(
-                  onPressed: _signInWithGoogle,
-                  icon: SvgPicture.asset(
-                    'assets/logo/google-logo-search-new-svgrepo-com.svg',
-                    height: 24,
-                    width: 24,
-                  ),
-                  label: const Text(
-                    'Sign in with Google',
-                    style: TextStyle(color: Colors.black),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.grey),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-                const SizedBox(height: 24),
+                // ElevatedButton.icon(
+                //   onPressed: _signInWithGoogle,
+                //   icon: SvgPicture.asset(
+                //     'assets/logo/google-logo-search-new-svgrepo-com.svg',
+                //     height: 24,
+                //     width: 24,
+                //   ),
+                //   label: const Text(
+                //     'Sign in with Google',
+                //     style: TextStyle(color: Colors.black),
+                //   ),
+                //   style: ElevatedButton.styleFrom(
+                //     backgroundColor: Colors.white,
+                //     side: const BorderSide(color: Colors.grey),
+                //     shape: RoundedRectangleBorder(
+                //       borderRadius: BorderRadius.circular(12),
+                //     ),
+                //     padding: const EdgeInsets.symmetric(vertical: 16),
+                //   ),
+                // ),
+                // const SizedBox(height: 24),
 
-                // Forgot Password Option
                 TextButton(
                   onPressed: () {
                     Navigator.pop(context);

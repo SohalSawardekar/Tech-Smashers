@@ -1,148 +1,170 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
+import 'package:lottie/lottie.dart';
 
-class Team {
-  final String name;
-  final int played;
-  final int won;
-  final int lost;
-  final int points;
-  final String recentForm;
-  final double winPercentage;
+class LeaderboardPage extends StatefulWidget {
+  const LeaderboardPage({Key? key}) : super(key: key);
 
-  Team({
-    required this.name,
-    required this.played,
-    required this.won,
-    required this.lost,
-    required this.points,
-    required this.recentForm,
-    required this.winPercentage,
-  });
+  @override
+  _LeaderboardPageState createState() => _LeaderboardPageState();
 }
 
-class LeaderboardPage extends StatelessWidget {
-  final List<Team> teams = [
-    Team(
-        name: "Thunder Smashers",
-        played: 10,
-        won: 8,
-        lost: 2,
-        points: 16,
-        recentForm: "WWLWW",
-        winPercentage: 80),
-    Team(
-        name: "Lightning Strikers",
-        played: 10,
-        won: 7,
-        lost: 3,
-        points: 14,
-        recentForm: "WLWWW",
-        winPercentage: 70),
-    // Add more teams here
-  ];
+class _LeaderboardPageState extends State<LeaderboardPage> {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  List<Map<String, dynamic>> teams = [];
+  bool isLoading = true;
+  bool isEditing = false;
+
+  @override
+  void initState() {
+    super.initState();
+    fetchTeams();
+  }
+
+  Future<void> fetchTeams() async {
+    setState(() => isLoading = true);
+    try {
+      final snapshot = await _firestore.collection('teams').get();
+      setState(() {
+        teams = snapshot.docs
+            .map((doc) => {'id': doc.id, ...doc.data() as Map<String, dynamic>})
+            .toList();
+        _sortTeams();
+      });
+    } catch (e) {
+      print('Error fetching teams: $e');
+    } finally {
+      setState(() => isLoading = false);
+    }
+  }
+
+  void _sortTeams() {
+    setState(() {
+      teams.sort((a, b) {
+        int pointCompare = b['points'].compareTo(a['points']);
+        if (pointCompare != 0) return pointCompare;
+        return b['aggregateScore'].compareTo(a['aggregateScore']);
+      });
+    });
+  }
+
+  Future<void> updateTeamScore(
+      String teamId, int points, double aggregateScore) async {
+    try {
+      await _firestore.collection('teams').doc(teamId).update({
+        'points': points,
+        'aggregateScore': aggregateScore,
+      });
+      fetchTeams();
+    } catch (e) {
+      print('Error updating team score: $e');
+    }
+  }
+
+  void _editScore(int index) async {
+    final team = teams[index];
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => ScoreEditDialog(
+        teamName: team['name'],
+        initialPoints: team['points'],
+        initialAggregateScore: team['aggregateScore'],
+      ),
+    );
+
+    if (result != null) {
+      updateTeamScore(team['id'], result['points'], result['aggregateScore']);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('Tournament Leaderboard'),
-        backgroundColor: Colors.blue,
+        title: const Text('Leaderboard'),
       ),
-      body: DefaultTabController(
-        length: 2,
-        child: Column(
-          children: [
-            // Tab Bar
-            TabBar(
-              tabs: [
-                Tab(text: 'Rankings'),
-                Tab(text: 'Statistics'),
-              ],
+      body: isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: teams.length,
+              itemBuilder: (context, index) {
+                final team = teams[index];
+                return Card(
+                  child: ListTile(
+                    title: Text(team['name']),
+                    subtitle: Text(
+                        'Points: ${team['points']} | Aggregate Score: ${team['aggregateScore']}'),
+                    trailing: isEditing
+                        ? IconButton(
+                            icon: const Icon(Icons.edit),
+                            onPressed: () => _editScore(index),
+                          )
+                        : null,
+                  ),
+                );
+              },
             ),
-            Expanded(
-              child: TabBarView(
-                children: [
-                  // Rankings Tab
-                  _buildRankingsTab(),
-                  // Statistics Tab
-                  _buildStatisticsTab(),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildRankingsTab() {
-    return ListView.builder(
-      itemCount: teams.length,
-      itemBuilder: (context, index) {
-        final team = teams[index];
-        return ListTile(
-          leading: CircleAvatar(
-            backgroundColor: Colors.blue,
-            child: Text((index + 1).toString(),
-                style: TextStyle(color: Colors.white)),
-          ),
-          title: Text(team.name),
-          subtitle: Text('${team.points} points'),
-          trailing: Text('${team.winPercentage}% Win'),
-        );
-      },
-    );
-  }
-
-  Widget _buildStatisticsTab() {
-    return ListView(
-      padding: EdgeInsets.all(16),
-      children: [
-        _buildStatisticCard(
-          title: 'Highest Win Streak',
-          value: '8 matches',
-          team: 'Thunder Smashers',
-          icon: Icons.trending_up,
-          color: Colors.green,
-        ),
-        _buildStatisticCard(
-          title: 'Most Points Scored',
-          value: '245 points',
-          team: 'Lightning Strikers',
-          icon: Icons.score,
-          color: Colors.orange,
-        ),
-        _buildStatisticCard(
-          title: 'Best Win Rate',
-          value: '80%',
-          team: 'Thunder Smashers',
-          icon: Icons.percent,
-          color: Colors.blue,
-        ),
-      ],
-    );
-  }
-
-  Widget _buildStatisticCard({
-    required String title,
-    required String value,
-    required String team,
-    required IconData icon,
-    required Color color,
-  }) {
-    return Card(
-      margin: EdgeInsets.only(bottom: 16),
-      color: Colors.blue.shade50,
-      child: ListTile(
-        leading: Icon(icon, color: color),
-        title: Text(title),
-        subtitle: Text('$value by $team'),
-        trailing: Icon(Icons.arrow_forward_ios, color: Colors.black),
+      floatingActionButton: FloatingActionButton(
+        child: Icon(isEditing ? Icons.check : Icons.edit),
+        onPressed: () => setState(() => isEditing = !isEditing),
       ),
     );
   }
 }
 
-void main() => runApp(MaterialApp(
-      home: LeaderboardPage(),
-    ));
+class ScoreEditDialog extends StatelessWidget {
+  final String teamName;
+  final int initialPoints;
+  final double initialAggregateScore;
+
+  const ScoreEditDialog({
+    Key? key,
+    required this.teamName,
+    required this.initialPoints,
+    required this.initialAggregateScore,
+  }) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    final pointsController =
+        TextEditingController(text: initialPoints.toString());
+    final scoreController =
+        TextEditingController(text: initialAggregateScore.toString());
+
+    return AlertDialog(
+      title: Text('Edit Scores for $teamName'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: pointsController,
+            decoration: const InputDecoration(labelText: 'Points'),
+            keyboardType: TextInputType.number,
+          ),
+          TextField(
+            controller: scoreController,
+            decoration: const InputDecoration(labelText: 'Aggregate Score'),
+            keyboardType: TextInputType.number,
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('Cancel'),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context, {
+              'points': int.parse(pointsController.text),
+              'aggregateScore': double.parse(scoreController.text)
+            });
+          },
+          child: const Text('Save'),
+        ),
+      ],
+    );
+  }
+}

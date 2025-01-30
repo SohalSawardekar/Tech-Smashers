@@ -42,7 +42,7 @@ class BadmintonEventApp extends StatelessWidget {
         '/register': (context) => const TeamRegistrationPage(),
         '/schedule': (context) => const TournamentBracketPage(),
         '/score': (context) => const ScoreEntryPage(),
-        '/leaderboard': (context) => LeaderboardPage(),
+        '/leaderboard': (context) => const LeaderboardPage(),
         '/scoreCount': (context) => const CounterPage(),
         '/userpage': (context) => const Userpage(),
       },

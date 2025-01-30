@@ -14,14 +14,14 @@ class _ScoreEntryPageState extends State<ScoreEntryPage> {
 
   String? selectedMatchId;
   List<Map<String, dynamic>> matches = [];
-  bool isLoading = false; // State to show circular progress indicator
+  bool isLoading = false;
+  bool isMatchComplete = false;
+  Map<String, dynamic> currentMatchData = {};
 
-  final TextEditingController set1Team1Controller = TextEditingController();
-  final TextEditingController set1Team2Controller = TextEditingController();
-  final TextEditingController set2Team1Controller = TextEditingController();
-  final TextEditingController set2Team2Controller = TextEditingController();
-  final TextEditingController set3Team1Controller = TextEditingController();
-  final TextEditingController set3Team2Controller = TextEditingController();
+  final List<TextEditingController> team1Controllers =
+      List.generate(5, (_) => TextEditingController());
+  final List<TextEditingController> team2Controllers =
+      List.generate(5, (_) => TextEditingController());
 
   @override
   void initState() {
@@ -31,97 +31,79 @@ class _ScoreEntryPageState extends State<ScoreEntryPage> {
 
   @override
   void dispose() {
-    set1Team1Controller.dispose();
-    set1Team2Controller.dispose();
-    set2Team1Controller.dispose();
-    set2Team2Controller.dispose();
-    set3Team1Controller.dispose();
-    set3Team2Controller.dispose();
+    for (var controller in team1Controllers) {
+      controller.dispose();
+    }
+    for (var controller in team2Controllers) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
   Future<void> fetchMatches() async {
-    setState(() {
-      isLoading = true; // Start loading
-    });
-
+    setState(() => isLoading = true);
     try {
-      final snapshot = await _firestore
-          .collection('matches')
-          .where('isComplete', isEqualTo: false)
-          .get();
-
+      final snapshot = await _firestore.collection('matches').get();
       setState(() {
-        matches = snapshot.docs
-            .map((doc) => {
-                  'id': doc.id,
-                  ...doc.data(),
-                })
-            .toList();
+        matches =
+            snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
       });
     } catch (e) {
       print('Error fetching matches: $e');
     } finally {
-      setState(() {
-        isLoading = false; // Stop loading
-      });
+      setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> fetchMatchDetails(String matchId) async {
+    try {
+      final doc = await _firestore.collection('matches').doc(matchId).get();
+      if (doc.exists) {
+        setState(() {
+          currentMatchData = doc.data()!;
+          isMatchComplete = currentMatchData['isComplete'] ?? false;
+          for (int i = 0; i < 5; i++) {
+            team1Controllers[i].text =
+                currentMatchData['set${i + 1}']?['team1Score']?.toString() ??
+                    '';
+            team2Controllers[i].text =
+                currentMatchData['set${i + 1}']?['team2Score']?.toString() ??
+                    '';
+          }
+        });
+      }
+    } catch (e) {
+      print('Error fetching match details: $e');
     }
   }
 
   Future<void> updateMatchScore(String matchId) async {
-    setState(() {
-      isLoading = true; // Start loading
-    });
-
+    setState(() => isLoading = true);
     try {
-      final matchData = {
-        'set1': {
-          'team1Score': int.tryParse(set1Team1Controller.text) ?? 0,
-          'team2Score': int.tryParse(set1Team2Controller.text) ?? 0,
-        },
-        'set2': {
-          'team1Score': int.tryParse(set2Team1Controller.text) ?? 0,
-          'team2Score': int.tryParse(set2Team2Controller.text) ?? 0,
-        },
-        'set3': {
-          'team1Score': int.tryParse(set3Team1Controller.text) ?? 0,
-          'team2Score': int.tryParse(set3Team2Controller.text) ?? 0,
-        },
-        'winner': {
-          'teamName': "",
-          'score': 0,
-        },
-        'isComplete': true, // Mark the match as complete
-      };
-
-      await _firestore.collection('matches').doc(matchId).update(matchData);
-
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Match scores updated successfully!')),
-      );
-
-      // Refresh matches after updating
-      await fetchMatches();
-
-      // Clear inputs
-      setState(() {
-        selectedMatchId = null;
-        set1Team1Controller.clear();
-        set1Team2Controller.clear();
-        set2Team1Controller.clear();
-        set2Team2Controller.clear();
-        set3Team1Controller.clear();
-        set3Team2Controller.clear();
-      });
+      Map<String, dynamic> matchData = {'isComplete': isMatchComplete};
+      for (int i = 0; i < 5; i++) {
+        if (team1Controllers[i].text.isNotEmpty ||
+            team2Controllers[i].text.isNotEmpty) {
+          matchData['set${i + 1}'] = {
+            'team1Score': int.tryParse(team1Controllers[i].text) ?? 0,
+            'team2Score': int.tryParse(team2Controllers[i].text) ?? 0,
+          };
+        }
+      }
+      if (matchData.isNotEmpty) {
+        await _firestore.collection('matches').doc(matchId).update(matchData);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Match scores updated successfully!')),
+        );
+        fetchMatches();
+      }
     } catch (e) {
       print('Error updating match score: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Failed to update match score')),
       );
     } finally {
-      setState(() {
-        isLoading = false; // Stop loading
-      });
+      setState(() => isLoading = false);
     }
   }
 
@@ -133,167 +115,89 @@ class _ScoreEntryPageState extends State<ScoreEntryPage> {
         backgroundColor: Colors.purple,
       ),
       body: isLoading
-          ? const Center(
-              child: CircularProgressIndicator(), // Show loading spinner
-            )
-          : SingleChildScrollView(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    const Text(
-                      'Select Match',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    DropdownButtonFormField<String>(
-                      value: selectedMatchId,
-                      hint: const Text('Select a match'),
-                      items: matches
-                          .map(
-                            (match) => DropdownMenuItem<String>(
+          ? const Center(child: CircularProgressIndicator())
+          : Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  DropdownButtonFormField<String>(
+                    value: selectedMatchId,
+                    hint: const Text('Select a match'),
+                    items: matches
+                        .map((match) => DropdownMenuItem<String>(
                               value: match['id'] as String,
                               child: Text(
-                                '${match['team1']} vs ${match['team2']}',
+                                  '${match['team1']} vs ${match['team2']}'),
+                            ))
+                        .toList(),
+                    onChanged: (value) {
+                      setState(() {
+                        selectedMatchId = value;
+                      });
+                      fetchMatchDetails(value!);
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  for (int i = 0; i < 5; i++)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Set ${i + 1}',
+                            style: const TextStyle(
+                                fontSize: 16, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: TextField(
+                                controller: team1Controllers[i],
+                                decoration: InputDecoration(
+                                  labelText: 'Team 1 Score',
+                                  border: OutlineInputBorder(),
+                                ),
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly
+                                ],
                               ),
                             ),
-                          )
-                          .toList(),
-                      onChanged: (value) {
-                        setState(() {
-                          selectedMatchId = value;
-                        });
-                      },
-                    ),
-                    const SizedBox(height: 24),
-                    const Text(
-                      'Enter Scores for Sets',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-                    ),
-                    const SizedBox(height: 16),
-                    Card(
-                      elevation: 4,
-                      child: Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          children: [
-                            const Text('Set 1'),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: set1Team1Controller,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Team 1 Score',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.digitsOnly,
-                                    ],
-                                  ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: TextField(
+                                controller: team2Controllers[i],
+                                decoration: InputDecoration(
+                                  labelText: 'Team 2 Score',
+                                  border: OutlineInputBorder(),
                                 ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: set1Team2Controller,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Team 2 Score',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.digitsOnly,
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            const Text('Set 2'),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: set2Team1Controller,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Team 1 Score',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.digitsOnly,
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: set2Team2Controller,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Team 2 Score',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.digitsOnly,
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 16),
-                            const Text('Set 3'),
-                            const SizedBox(height: 8),
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: set3Team1Controller,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Team 1 Score',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.digitsOnly,
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Expanded(
-                                  child: TextField(
-                                    controller: set3Team2Controller,
-                                    decoration: const InputDecoration(
-                                      labelText: 'Team 2 Score',
-                                      border: OutlineInputBorder(),
-                                    ),
-                                    keyboardType: TextInputType.number,
-                                    inputFormatters: [
-                                      FilteringTextInputFormatter.digitsOnly,
-                                    ],
-                                  ),
-                                ),
-                              ],
+                                keyboardType: TextInputType.number,
+                                inputFormatters: [
+                                  FilteringTextInputFormatter.digitsOnly
+                                ],
+                              ),
                             ),
                           ],
                         ),
-                      ),
+                        const SizedBox(height: 16),
+                      ],
                     ),
-                    const SizedBox(height: 24),
-                    ElevatedButton(
-                      onPressed: selectedMatchId == null
-                          ? null
-                          : () => updateMatchScore(selectedMatchId!),
-                      child: const Text('Update Match Scores'),
-                    ),
-                  ],
-                ),
+                  SwitchListTile(
+                    title: const Text('Match Completed'),
+                    value: isMatchComplete,
+                    onChanged: (value) {
+                      setState(() {
+                        isMatchComplete = value;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: selectedMatchId == null
+                        ? null
+                        : () => updateMatchScore(selectedMatchId!),
+                    child: const Text('Update Match Scores'),
+                  ),
+                ],
               ),
             ),
     );
