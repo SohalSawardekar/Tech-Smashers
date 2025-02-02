@@ -98,27 +98,33 @@ class _TournamentBracketPageState extends State<TournamentBracketPage> {
         'roundNumber': roundNumber,
         'matchNumber': matchNumber,
         'isComplete': isComplete,
-        'winner': {
-          'teamName': "",
-          'score': 0,
-        },
         'set1': {
+          'team1Player': "",
+          'team2Player': "",
           'team1Score': 0,
           'team2Score': 0,
         },
         'set2': {
+          'team1Player': "",
+          'team2Player': "",
           'team1Score': 0,
           'team2Score': 0,
         },
         'set3': {
+          'team1Player': "",
+          'team2Player': "",
           'team1Score': 0,
           'team2Score': 0,
         },
         'set4': {
+          'team1Player': "",
+          'team2Player': "",
           'team1Score': 0,
           'team2Score': 0,
         },
         'set5': {
+          'team1Player': "",
+          'team2Player': "",
           'team1Score': 0,
           'team2Score': 0,
         },
