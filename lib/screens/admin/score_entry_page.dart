@@ -82,21 +82,17 @@ class _ScoreEntryPageState extends State<ScoreEntryPage> {
     try {
       Map<String, dynamic> matchData = {'isComplete': isMatchComplete};
       for (int i = 0; i < 5; i++) {
-        if (team1Controllers[i].text.isNotEmpty ||
-            team2Controllers[i].text.isNotEmpty) {
-          matchData['set${i + 1}'] = {
-            'team1Score': int.tryParse(team1Controllers[i].text) ?? 0,
-            'team2Score': int.tryParse(team2Controllers[i].text) ?? 0,
-          };
-        }
+        matchData['set${i + 1}'] = {
+          'team1Score': int.tryParse(team1Controllers[i].text) ?? 0,
+          'team2Score': int.tryParse(team2Controllers[i].text) ?? 0,
+        };
       }
-      if (matchData.isNotEmpty) {
-        await _firestore.collection('matches').doc(matchId).update(matchData);
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Match scores updated successfully!')),
-        );
-        fetchMatches();
-      }
+      await _firestore.collection('matches').doc(matchId).update(matchData);
+      await _updateLeaderboard();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Match scores updated successfully!')),
+      );
+      fetchMatches();
     } catch (e) {
       print('Error updating match score: $e');
       ScaffoldMessenger.of(context).showSnackBar(
@@ -104,6 +100,45 @@ class _ScoreEntryPageState extends State<ScoreEntryPage> {
       );
     } finally {
       setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _updateLeaderboard() async {
+    try {
+      final matchesSnapshot = await _firestore.collection('matches').get();
+      Map<String, num> teamScores = {};
+
+      for (var match in matchesSnapshot.docs) {
+        final matchData = match.data();
+        final team1 = matchData['team1'];
+        final team2 = matchData['team2'];
+
+        if (team1 != null && team2 != null) {
+          for (int i = 1; i <= 5; i++) {
+            final set = matchData['set$i'];
+            if (set != null) {
+              teamScores[team1] =
+                  (teamScores[team1] ?? 0) + (set['team1Score'] ?? 0);
+              teamScores[team2] =
+                  (teamScores[team2] ?? 0) + (set['team2Score'] ?? 0);
+            }
+          }
+        }
+      }
+
+      List<Map<String, dynamic>> updatedTeams = teamScores.entries
+          .map((entry) => {
+                'name': entry.key,
+                'totalScore': entry.value,
+              })
+          .toList();
+
+      await _firestore.collection('leaderboard').doc('latest').set({
+        'teams': updatedTeams,
+        'updatedAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      print('Error updating leaderboard: $e');
     }
   }
 
@@ -152,10 +187,8 @@ class _ScoreEntryPageState extends State<ScoreEntryPage> {
                             Expanded(
                               child: TextField(
                                 controller: team1Controllers[i],
-                                decoration: InputDecoration(
-                                  labelText: 'Team 1 Score',
-                                  border: OutlineInputBorder(),
-                                ),
+                                decoration: const InputDecoration(
+                                    labelText: 'Team 1 Score'),
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
                                   FilteringTextInputFormatter.digitsOnly
@@ -166,10 +199,8 @@ class _ScoreEntryPageState extends State<ScoreEntryPage> {
                             Expanded(
                               child: TextField(
                                 controller: team2Controllers[i],
-                                decoration: InputDecoration(
-                                  labelText: 'Team 2 Score',
-                                  border: OutlineInputBorder(),
-                                ),
+                                decoration: const InputDecoration(
+                                    labelText: 'Team 2 Score'),
                                 keyboardType: TextInputType.number,
                                 inputFormatters: [
                                   FilteringTextInputFormatter.digitsOnly
@@ -178,19 +209,8 @@ class _ScoreEntryPageState extends State<ScoreEntryPage> {
                             ),
                           ],
                         ),
-                        const SizedBox(height: 16),
                       ],
                     ),
-                  SwitchListTile(
-                    title: const Text('Match Completed'),
-                    value: isMatchComplete,
-                    onChanged: (value) {
-                      setState(() {
-                        isMatchComplete = value;
-                      });
-                    },
-                  ),
-                  const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: selectedMatchId == null
                         ? null

@@ -29,7 +29,7 @@ class _TournamentBracketPageState extends State<TournamentBracketPage> {
 
   Future<void> _fetchTeams() async {
     setState(() {
-      isLoading = true; 
+      isLoading = true;
     });
 
     try {
@@ -70,7 +70,7 @@ class _TournamentBracketPageState extends State<TournamentBracketPage> {
       debugPrint('Error fetching matches: $e');
     } finally {
       setState(() {
-        isLoading = false; 
+        isLoading = false;
       });
     }
   }
@@ -111,6 +111,14 @@ class _TournamentBracketPageState extends State<TournamentBracketPage> {
           'team2Score': 0,
         },
         'set3': {
+          'team1Score': 0,
+          'team2Score': 0,
+        },
+        'set4': {
+          'team1Score': 0,
+          'team2Score': 0,
+        },
+        'set5': {
           'team1Score': 0,
           'team2Score': 0,
         },
