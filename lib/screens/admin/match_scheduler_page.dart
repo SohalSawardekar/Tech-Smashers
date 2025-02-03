@@ -13,12 +13,15 @@ class _TournamentBracketPageState extends State<TournamentBracketPage> {
 
   List<Map<String, dynamic>> matches = [];
   List<String> _teams = [];
+  List<String> _team1Players = [];
+  List<String> _team2Players = [];
   String? _team1;
   String? _team2;
-  bool isComplete = false;
   bool isLoading = false;
   final TextEditingController _matchNumberController = TextEditingController();
   final TextEditingController _roundNumberController = TextEditingController();
+  List<String?> _selectedTeam1Players = List.filled(5, null);
+  List<String?> _selectedTeam2Players = List.filled(5, null);
 
   @override
   void initState() {
@@ -28,50 +31,63 @@ class _TournamentBracketPageState extends State<TournamentBracketPage> {
   }
 
   Future<void> _fetchTeams() async {
-    setState(() {
-      isLoading = true;
-    });
-
+    setState(() => isLoading = true);
     try {
       final snapshot = await _firestore.collection('teams').get();
-      final List<String> teams =
-          snapshot.docs.map((doc) => doc['name'].toString()).toList();
-
       setState(() {
-        _teams = teams;
+        _teams = snapshot.docs.map((doc) => doc['name'].toString()).toList();
       });
     } catch (e) {
       debugPrint('Error fetching teams: $e');
     } finally {
-      setState(() {
-        isLoading = false; // Stop loading
-      });
+      setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _fetchPlayers(String team, bool isTeam1) async {
+    setState(() => isLoading = true);
+    try {
+      final snapshot = await _firestore
+          .collection('teams')
+          .where('name', isEqualTo: team)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final teamData = snapshot.docs.first.data();
+        final List<dynamic> playersData = teamData['players'] ?? [];
+
+        final List<String> playerNames =
+            playersData.map((player) => player['name'] as String).toList();
+
+        setState(() {
+          if (isTeam1) {
+            _team1Players = playerNames;
+            _selectedTeam1Players = List.filled(5, null);
+          } else {
+            _team2Players = playerNames;
+            _selectedTeam2Players = List.filled(5, null);
+          }
+        });
+      }
+    } catch (e) {
+      debugPrint('Error fetching players: $e');
+    } finally {
+      setState(() => isLoading = false);
     }
   }
 
   Future<void> _fetchMatches() async {
-    setState(() {
-      isLoading = true; // Start loading
-    });
-
+    setState(() => isLoading = true);
     try {
       final snapshot = await _firestore.collection('matches').get();
-      final List<Map<String, dynamic>> fetchedMatches = snapshot.docs
-          .map((doc) => {
-                'id': doc.id,
-                ...doc.data(),
-              })
-          .toList();
-
       setState(() {
-        matches = fetchedMatches;
+        matches =
+            snapshot.docs.map((doc) => {'id': doc.id, ...doc.data()}).toList();
       });
     } catch (e) {
       debugPrint('Error fetching matches: $e');
     } finally {
-      setState(() {
-        isLoading = false;
-      });
+      setState(() => isLoading = false);
     }
   }
 
@@ -87,187 +103,162 @@ class _TournamentBracketPageState extends State<TournamentBracketPage> {
       return;
     }
 
-    setState(() {
-      isLoading = true; // Start loading
-    });
-
+    setState(() => isLoading = true);
     try {
       await _firestore.collection('matches').add({
         'team1': _team1,
         'team2': _team2,
         'roundNumber': roundNumber,
         'matchNumber': matchNumber,
-        'isComplete': isComplete,
-        'set1': {
-          'team1Player': "",
-          'team2Player': "",
-          'team1Score': 0,
-          'team2Score': 0,
-        },
-        'set2': {
-          'team1Player': "",
-          'team2Player': "",
-          'team1Score': 0,
-          'team2Score': 0,
-        },
-        'set3': {
-          'team1Player': "",
-          'team2Player': "",
-          'team1Score': 0,
-          'team2Score': 0,
-        },
-        'set4': {
-          'team1Player': "",
-          'team2Player': "",
-          'team1Score': 0,
-          'team2Score': 0,
-        },
-        'set5': {
-          'team1Player': "",
-          'team2Player': "",
-          'team1Score': 0,
-          'team2Score': 0,
-        },
+        'sets': List.generate(
+            5,
+            (index) => {
+                  'team1Player': _selectedTeam1Players[index],
+                  'team2Player': _selectedTeam2Players[index],
+                  'team1Score': 0,
+                  'team2Score': 0,
+                }),
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Match scheduled successfully!')),
       );
 
-      await _fetchMatches(); // Refresh matches after scheduling
-
-      setState(() {
-        _team1 = null;
-        _team2 = null;
-        _matchNumberController.clear();
-        _roundNumberController.clear();
-      });
+      await _fetchMatches();
     } catch (e) {
       debugPrint('Error scheduling match: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Failed to schedule match')),
-      );
     } finally {
-      setState(() {
-        isLoading = false; // Stop loading
-      });
+      setState(() => isLoading = false);
+    }
+  }
+
+  Future<void> _deleteMatch(String matchId) async {
+    try {
+      await _firestore.collection('matches').doc(matchId).delete();
+      _fetchMatches();
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Match deleted successfully!')),
+      );
+    } catch (e) {
+      debugPrint('Error deleting match: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Schedule Match'),
-      ),
-      body: SafeArea(
+      appBar: AppBar(title: const Text('Schedule Match')),
+      body: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Colors.blue[50]!, Colors.indigo[50]!],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
         child: isLoading
-            ? const Center(child: CircularProgressIndicator()) // Show loader
+            ? const Center(child: CircularProgressIndicator())
             : SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Select Teams and Enter Match Number',
-                        style: TextStyle(
-                            fontSize: 18, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        value: _team1,
-                        hint: const Text('Select Team 1'),
-                        items: _teams
-                            .map((team) => DropdownMenuItem(
-                                value: team, child: Text(team)))
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _team1 = value;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      DropdownButtonFormField<String>(
-                        value: _team2,
-                        hint: const Text('Select Team 2'),
-                        items: _teams
-                            .map((team) => DropdownMenuItem(
-                                value: team, child: Text(team)))
-                            .toList(),
-                        onChanged: (value) {
-                          setState(() {
-                            _team2 = value;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _roundNumberController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Enter Round Number',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _matchNumberController,
-                        keyboardType: TextInputType.number,
-                        decoration: const InputDecoration(
-                          labelText: 'Enter Match Number',
-                          border: OutlineInputBorder(),
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: _scheduleMatch,
-                        child: const Text('Schedule Match'),
-                      ),
-                      const SizedBox(height: 24),
-                      Column(
-                        children: [
-                          const Text(
-                            'Scheduled Matches',
-                            style: TextStyle(
-                                fontSize: 18, fontWeight: FontWeight.bold),
-                          ),
-                          const SizedBox(height: 16),
-                          ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: matches.length,
-                            itemBuilder: (context, index) {
-                              final match = matches[index];
-                              final isComplete = match['isComplete'] as bool;
-                              return Card(
-                                margin: const EdgeInsets.symmetric(vertical: 4),
-                                child: ListTile(
-                                  title: Text(
-                                    '${match['team1']} vs ${match['team2']}',
-                                    style: const TextStyle(
-                                        fontWeight: FontWeight.bold),
-                                  ),
-                                  subtitle: Text(
-                                    'Round: ${match['roundNumber']}, Match: ${match['matchNumber']}',
-                                  ),
-                                  trailing: Text(
-                                    isComplete ? 'Completed' : 'Pending',
-                                    style: TextStyle(
-                                      color: isComplete
-                                          ? Colors.green
-                                          : Colors.red, // Red or Green
-                                      fontWeight: FontWeight.bold,
+                child: Column(
+                  children: [
+                    Card(
+                      elevation: 4,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Column(
+                          children: [
+                            DropdownButtonFormField<String>(
+                              value: _team1,
+                              hint: const Text('Select Team 1'),
+                              items: _teams
+                                  .map((team) => DropdownMenuItem(
+                                      value: team, child: Text(team)))
+                                  .toList(),
+                              onChanged: (value) {
+                                setState(() => _team1 = value);
+                                _fetchPlayers(value!, true);
+                              },
+                            ),
+                            DropdownButtonFormField<String>(
+                              value: _team2,
+                              hint: const Text('Select Team 2'),
+                              items: _teams
+                                  .map((team) => DropdownMenuItem(
+                                      value: team, child: Text(team)))
+                                  .toList(),
+                              onChanged: (value) {
+                                setState(() => _team2 = value);
+                                _fetchPlayers(value!, false);
+                              },
+                            ),
+                            const SizedBox(height: 32),
+                            Text(
+                                '${_team1 ?? 'Team 1'} vs ${_team2 ?? 'Team 2'}',
+                                style: const TextStyle(
+                                    fontSize: 18, fontWeight: FontWeight.bold)),
+                            const SizedBox(height: 16),
+                            for (int i = 0; i < 5; i++)
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      value: _selectedTeam1Players[i],
+                                      hint: Text('Set ${i + 1} Player'),
+                                      items: _team1Players
+                                          .map((player) => DropdownMenuItem(
+                                              value: player,
+                                              child: Text(player)))
+                                          .toList(),
+                                      onChanged: (value) => setState(() =>
+                                          _selectedTeam1Players[i] = value),
                                     ),
                                   ),
-                                ),
-                              );
-                            },
-                          ),
-                        ],
+                                  const Padding(
+                                    padding:
+                                        EdgeInsets.symmetric(horizontal: 10),
+                                    child: Text("vs"),
+                                  ),
+                                  Expanded(
+                                    child: DropdownButtonFormField<String>(
+                                      value: _selectedTeam2Players[i],
+                                      hint: Text('Set ${i + 1} Player'),
+                                      items: _team2Players
+                                          .map((player) => DropdownMenuItem(
+                                              value: player,
+                                              child: Text(player)))
+                                          .toList(),
+                                      onChanged: (value) => setState(() =>
+                                          _selectedTeam2Players[i] = value),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            const SizedBox(height: 16),
+                            ElevatedButton(
+                              onPressed: _scheduleMatch,
+                              child: const Text('Schedule Match'),
+                            ),
+                          ],
+                        ),
                       ),
-                    ],
-                  ),
+                    ),
+                    const SizedBox(height: 20),
+                    const Text(
+                      'Scheduled Matches',
+                      style:
+                          TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                    ),
+                    ...matches.map((match) => ListTile(
+                          title: Text("${match['team1']} VS ${match['team2']}"),
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete, color: Colors.red),
+                            onPressed: () => _deleteMatch(match['id']),
+                          ),
+                        )),
+                  ],
                 ),
               ),
       ),

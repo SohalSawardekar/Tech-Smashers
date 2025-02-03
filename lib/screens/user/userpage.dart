@@ -1,179 +1,380 @@
-import 'package:flutter/material.dart';
+// ignore_for_file: library_private_types_in_public_api, unused_import, prefer_const_constructors
 
-class UserPage extends StatelessWidget {
-  const UserPage({Key? key}) : super(key: key);
+import 'package:flutter/material.dart';
+import 'dart:math' as math;
+import 'dart:async';
+import 'package:simple_animations/simple_animations.dart';
+import 'package:tech_smash/services/auth_service.dart';
+
+class ParticlePainter extends CustomPainter {
+  final List<Particle> particles;
+  ParticlePainter(this.particles);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    for (var particle in particles) {
+      final paint = Paint()
+        ..color = particle.color.withOpacity(particle.opacity)
+        ..style = PaintingStyle.fill;
+      canvas.drawCircle(particle.position, particle.size, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(ParticlePainter oldDelegate) => true;
+}
+
+class Particle {
+  Offset position;
+  Color color;
+  double size;
+  double opacity;
+  double speed;
+  double angle;
+
+  Particle({
+    required this.position,
+    required this.color,
+    required this.size,
+    required this.opacity,
+    required this.speed,
+    required this.angle,
+  });
+
+  void update(Size size) {
+    position = Offset(
+      position.dx + math.cos(angle) * speed,
+      position.dy + math.sin(angle) * speed,
+    );
+
+    if (position.dx < 0 || position.dx > size.width) {
+      angle = math.pi - angle;
+    }
+    if (position.dy < 0 || position.dy > size.height) {
+      angle = -angle;
+    }
+  }
+}
+
+class UserPage extends StatefulWidget {
+  const UserPage({super.key});
+
+  @override
+  _UserPageState createState() => _UserPageState();
+}
+
+class _UserPageState extends State<UserPage> with TickerProviderStateMixin {
+  final List<Particle> particles = [];
+  final math.Random random = math.Random();
+  late AnimationController _buttonController;
+  late AnimationController _titleController;
+  late Animation<double> _titleScale;
+  late Animation<double> _titleGlow;
+  int selectedIndex = -1;
+  final AuthService _authService = AuthService();
+
+  final List<MenuOption> menuOptions = [
+    MenuOption(
+      title: 'Teams',
+      icon: Icons.group,
+      route: '/teams',
+      color: Colors.blue,
+      description: 'View all registered teams',
+    ),
+    MenuOption(
+      title: 'Matches',
+      icon: Icons.sports_volleyball,
+      route: '/matches',
+      color: Colors.purple,
+      description: 'Check match schedules',
+    ),
+    MenuOption(
+      title: 'Scoreboard',
+      icon: Icons.score,
+      route: '/scoreboard',
+      color: Colors.orange,
+      description: 'Current tournament scores',
+    ),
+    MenuOption(
+      title: 'Leaderboard',
+      icon: Icons.leaderboard,
+      route: '/leaderboard',
+      color: Colors.green,
+      description: 'Top performing teams',
+    ),
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _initializeParticles();
+    _setupAnimations();
+    _startParticleAnimation();
+  }
+
+  void _initializeParticles() {
+    for (int i = 0; i < 50; i++) {
+      particles.add(
+        Particle(
+          position: Offset(
+            random.nextDouble() * 400,
+            random.nextDouble() * 800,
+          ),
+          color: Colors.white,
+          size: random.nextDouble() * 3 + 1,
+          opacity: random.nextDouble() * 0.6 + 0.2,
+          speed: random.nextDouble() * 2 + 0.5,
+          angle: random.nextDouble() * 2 * math.pi,
+        ),
+      );
+    }
+  }
+
+  void _setupAnimations() {
+    _buttonController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    _titleController = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    )..repeat(reverse: true);
+
+    _titleScale = Tween<double>(begin: 1.0, end: 1.1).animate(
+      CurvedAnimation(
+        parent: _titleController,
+        curve: Curves.easeInOut,
+      ),
+    );
+
+    _titleGlow = Tween<double>(begin: 0, end: 10).animate(
+      CurvedAnimation(
+        parent: _titleController,
+        curve: Curves.easeInOut,
+      ),
+    );
+  }
+
+  void _startParticleAnimation() {
+    Timer.periodic(const Duration(milliseconds: 16), (timer) {
+      if (mounted) {
+        setState(() {
+          for (var particle in particles) {
+            particle.update(const Size(400, 800));
+          }
+        });
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _buttonController.dispose();
+    _titleController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    final List<Map<String, dynamic>> menuItems = [
-      {
-        'title': 'Teams',
-        'icon': Icons.group,
-        'color': Colors.blue,
-        'route': '/teams',
-        'description': 'View all registered teams',
-      },
-      {
-        'title': 'Matches',
-        'icon': Icons.sports_volleyball,
-        'color': Colors.orange,
-        'route': '/matches',
-        'description': 'Check match schedules',
-      },
-      {
-        'title': 'Scoreboard',
-        'icon': Icons.score,
-        'color': Colors.green,
-        'route': '/scoreboard',
-        'description': 'Current tournament scores',
-      },
-      {
-        'title': 'Leaderboard',
-        'icon': Icons.leaderboard,
-        'color': Colors.purple,
-        'route': '/leaderboard',
-        'description': 'Top performing teams',
-      },
-    ];
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Tournament Dashboard'),
-        elevation: 0,
+        backgroundColor: const Color.fromARGB(222, 13, 72, 161),
+        automaticallyImplyLeading: false,
       ),
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.blue.shade50, Colors.white],
-          ),
-        ),
-        child: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Welcome Back!',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'Select a category to view details',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ],
-                ),
+      body: Stack(
+        children: [
+          // Background with particles
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Color(0xFF1a237e),
+                  Color(0xFF0d47a1),
+                  Color(0xFF01579b),
+                ],
               ),
-              Expanded(
-                child: GridView.builder(
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    childAspectRatio: 1.1,
-                    crossAxisSpacing: 16,
-                    mainAxisSpacing: 16,
-                  ),
-                  itemCount: menuItems.length,
-                  itemBuilder: (context, index) {
-                    final item = menuItems[index];
-                    return GestureDetector(
-                      onTap: () => Navigator.pushNamed(context, item['route']),
-                      child: Card(
-                        elevation: 4,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(20),
-                            gradient: LinearGradient(
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                              colors: [
-                                item['color'].withOpacity(0.1),
-                                item['color'].withOpacity(0.05),
-                              ],
-                            ),
-                          ),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  item['icon'],
-                                  size: 40,
-                                  color: item['color'],
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  item['title'],
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  item['description'],
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                  textAlign: TextAlign.center,
-                                ),
-                              ],
-                            ),
+            ),
+            child: CustomPaint(
+              painter: ParticlePainter(particles),
+              child: Container(),
+            ),
+          ),
+          // Main content
+          SafeArea(
+            child: Column(
+              children: [
+                const SizedBox(
+                  height: 50,
+                ),
+                // Animated title
+                AnimatedBuilder(
+                  animation: _titleController,
+                  builder: (context, child) {
+                    return Container(
+                      padding: const EdgeInsets.all(10),
+                      child: Transform.scale(
+                        scale: _titleScale.value,
+                        child: Text(
+                          'Tech Smash',
+                          style: TextStyle(
+                            fontSize: 40,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            shadows: [
+                              Shadow(
+                                color: Colors.blue.withOpacity(0.5),
+                                blurRadius: _titleGlow.value,
+                                offset: const Offset(0, 0),
+                              ),
+                            ],
                           ),
                         ),
                       ),
                     );
                   },
                 ),
-              ),
-              // Bottom status section
-              Container(
-                padding: const EdgeInsets.all(16),
-                child: Card(
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: const Padding(
-                    padding: EdgeInsets.all(16.0),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, color: Colors.blue),
-                        SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'Stay tuned for live match updates!',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+
+                const Text(
+                  'Badminton Tournament',
+                  style: TextStyle(
+                    fontSize: 20,
+                    color: Colors.white70,
+                    letterSpacing: 2,
                   ),
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 20),
+
+                // Menu options
+                Expanded(
+                  child: ListView.builder(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: menuOptions.length,
+                    itemBuilder: (context, index) {
+                      return TweenAnimationBuilder<double>(
+                        duration: const Duration(milliseconds: 500),
+                        tween: Tween(begin: 0.0, end: 1.0),
+                        curve: Curves.easeOutQuint,
+                        builder: (context, value, child) {
+                          return Transform.translate(
+                            offset: Offset(0, 50 * (1 - value)),
+                            child: Opacity(
+                              opacity: value,
+                              child: _buildMenuCard(menuOptions[index], index),
+                            ),
+                          );
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMenuCard(MenuOption option, int index) {
+    bool isSelected = selectedIndex == index;
+
+    return GestureDetector(
+      onTapDown: (_) => setState(() => selectedIndex = index),
+      onTapUp: (_) {
+        setState(() => selectedIndex = -1);
+        Navigator.pushNamed(context, option.route);
+      },
+      onTapCancel: () => setState(() => selectedIndex = -1),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        margin: const EdgeInsets.only(bottom: 20),
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? option.color.withOpacity(0.2)
+              : Colors.white.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isSelected ? option.color : Colors.white.withOpacity(0.2),
+            width: 2,
+          ),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: option.color.withOpacity(0.3),
+                    blurRadius: 20,
+                    spreadRadius: 2,
+                  )
+                ]
+              : [],
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: option.color.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                option.icon,
+                color: Colors.white,
+                size: 30,
+              ),
+            ),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    option.title,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    option.description,
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 14,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right,
+              color: Colors.white70,
+            ),
+          ],
         ),
       ),
     );
   }
+}
+
+class MenuOption {
+  final String title;
+  final IconData icon;
+  final String route;
+  final Color color;
+  final String description;
+
+  MenuOption({
+    required this.title,
+    required this.icon,
+    required this.route,
+    required this.color,
+    required this.description,
+  });
 }

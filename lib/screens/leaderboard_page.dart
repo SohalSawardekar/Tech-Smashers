@@ -1,253 +1,247 @@
-import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'dart:async';
+import 'package:flutter/material.dart';
+
+class Team {
+  final int id;
+  final String name;
+  final int wins;
+  final int losses;
+  final int score;
+  final int aggregateScore;
+
+  Team({
+    required this.id,
+    required this.name,
+    required this.wins,
+    required this.losses,
+    required this.score,
+    required this.aggregateScore,
+  });
+
+  // Factory method to create a Team from Firestore data
+  factory Team.fromMap(Map<String, dynamic> data) {
+    return Team(
+      id: data['id'] ?? 0,
+      name: data['name'] ?? '',
+      wins: data['wins'] ?? 0,
+      losses: data['losses'] ?? 0,
+      score: data['score'] ?? 0,
+      aggregateScore: data['aggregateScore'] ?? 0,
+    );
+  }
+}
 
 class LeaderboardPage extends StatefulWidget {
-  const LeaderboardPage({Key? key}) : super(key: key);
+  const LeaderboardPage({super.key});
 
   @override
-  _LeaderboardPageState createState() => _LeaderboardPageState();
+  State<LeaderboardPage> createState() => _LeaderboardPageState();
 }
 
 class _LeaderboardPageState extends State<LeaderboardPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  List<Map<String, dynamic>> teams = [];
-  bool isLoading = true;
-  Timer? _updateTimer;
+  List<Team> teams = []; // Initialize list
+  String sortColumn = 'score';
+  bool ascending = false;
 
   @override
   void initState() {
     super.initState();
-    fetchLeaderboard();
-    _startPeriodicUpdate();
+    _fetchMatches(); // Fetch data when the widget initializes
   }
 
-  @override
-  void dispose() {
-    _updateTimer?.cancel();
-    super.dispose();
+  Future<void> _fetchMatches() async {
+    try {
+      final snapshot = await _firestore.collection('leaderboard').get();
+      setState(() {
+        teams = snapshot.docs
+            .map((doc) => Team.fromMap(doc.data() as Map<String, dynamic>))
+            .toList();
+
+        // Sort: First by `score` (desc), then by `aggregateScore` (desc)
+        teams.sort((a, b) {
+          if (b.score != a.score) {
+            return b.score.compareTo(a.score); // Sort by score descending
+          }
+          return b.aggregateScore.compareTo(
+              a.aggregateScore); // Sort by aggregate score descending
+        });
+      });
+    } catch (e) {
+      print('Error fetching matches: $e');
+    }
   }
 
-  void _startPeriodicUpdate() {
-    _updateTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
-      _calculateAndUpdateScores();
+  void _sort<T>(Comparable<T> Function(Team team) getField, String columnName,
+      int columnIndex) {
+    setState(() {
+      if (sortColumn == columnName) {
+        ascending = !ascending;
+      } else {
+        sortColumn = columnName;
+        ascending = true;
+      }
+
+      teams.sort((a, b) {
+        final aValue = getField(a);
+        final bValue = getField(b);
+        return ascending
+            ? Comparable.compare(aValue, bValue)
+            : Comparable.compare(bValue, aValue);
+      });
     });
   }
 
-  Future<void> fetchLeaderboard() async {
-    setState(() => isLoading = true);
-    try {
-      final leaderboardDoc =
-          await _firestore.collection('leaderboard').doc('latest').get();
-      if (!leaderboardDoc.exists) {
-        await _initializeLeaderboard();
-      } else {
-        setState(() {
-          teams = List<Map<String, dynamic>>.from(
-              leaderboardDoc.data()?['teams'] ?? []);
-          _sortTeams();
-        });
-      }
-    } catch (e) {
-      print('Error fetching leaderboard: $e');
-    } finally {
-      setState(() => isLoading = false);
+  Widget _buildRankIcon(int index) {
+    switch (index) {
+      case 0:
+        return Icon(Icons.emoji_events, color: Colors.amber[400], size: 24);
+      case 1:
+        return Icon(Icons.workspace_premium, color: Colors.grey[400], size: 24);
+      case 2:
+        return Icon(Icons.military_tech, color: Colors.orange[700], size: 24);
+      default:
+        return Icon(Icons.sports_score, color: Colors.blue[400], size: 24);
     }
-  }
-
-  Future<void> _initializeLeaderboard() async {
-    try {
-      final teamsSnapshot = await _firestore.collection('teams').get();
-      teams = teamsSnapshot.docs
-          .map((doc) =>
-              {'id': doc.id, 'name': doc.data()['name'], 'totalScore': 0})
-          .toList();
-      await _firestore.collection('leaderboard').doc('latest').set({
-        'teams': teams,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      _sortTeams();
-      setState(() {});
-    } catch (e) {
-      print('Error initializing leaderboard: $e');
-    }
-  }
-
-  Future<void> _calculateAndUpdateScores() async {
-    try {
-      final matchesSnapshot = await _firestore.collection('matches').get();
-      Map<String, num> teamScores = {};
-
-      for (var match in matchesSnapshot.docs) {
-        final matchData = match.data();
-        final team1 = matchData['team1'];
-        final team2 = matchData['team2'];
-
-        if (team1 != null && team2 != null) {
-          for (int i = 1; i <= 5; i++) {
-            final set = matchData['set$i'];
-            if (set != null &&
-                set.containsKey('team1Score') &&
-                set.containsKey('team2Score')) {
-              teamScores[team1] = (teamScores[team1] ?? 0) + set['team1Score'];
-              teamScores[team2] = (teamScores[team2] ?? 0) + set['team2Score'];
-            }
-          }
-        }
-      }
-
-      teams = teams.map((team) {
-        return {
-          'id': team['id'],
-          'name': team['name'],
-          'totalScore': teamScores.containsKey(team['name'])
-              ? teamScores[team['name']]!
-              : 0,
-        };
-      }).toList();
-
-      _sortTeams();
-
-      await _firestore.collection('leaderboard').doc('latest').update({
-        'teams': teams,
-        'updatedAt': FieldValue.serverTimestamp(),
-      });
-      setState(() {});
-    } catch (e) {
-      print('Error updating leaderboard scores: $e');
-    }
-  }
-
-  void _sortTeams() {
-    teams.sort((a, b) => b['totalScore'].compareTo(a['totalScore']));
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Leaderboard'),
-        elevation: 0,
-        backgroundColor: Colors.blue,
-      ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [Colors.blue.shade50, Colors.white],
+      appBar: AppBar(),
+      body: Container(
+        width: double.infinity,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              Colors.blue[50]!,
+              Colors.indigo[50]!,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Column(
+              children: [
+                const Text(
+                  'Team Leaderboard',
+                  style: TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.indigo,
+                  ),
                 ),
-              ),
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: teams.length,
-                itemBuilder: (context, index) {
-                  final team = teams[index];
-                  final isTopThree = index < 3;
-
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: Card(
-                      elevation: 4,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Container(
-                        padding: const EdgeInsets.all(16),
-                        child: Row(
-                          children: [
-                            // Rank Circle
-                            Container(
-                              width: 50,
-                              height: 50,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: isTopThree
-                                    ? [
-                                        Colors.amber, // Gold
-                                        Colors.grey[300], // Silver
-                                        Colors.brown[300], // Bronze
-                                      ][index]
-                                    : Colors.blue.withOpacity(0.1),
+                const SizedBox(height: 24),
+                Expanded(
+                  child: Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: teams.isEmpty
+                          ? const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(20.0),
+                                child: CircularProgressIndicator(),
                               ),
-                              child: Center(
-                                child: Text(
-                                  '${index + 1}',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.bold,
-                                    color: isTopThree
-                                        ? Colors.white
-                                        : Colors.blue[900],
-                                  ),
+                            )
+                          : DataTable(
+                              headingRowColor:
+                                  WidgetStateProperty.all(Colors.indigo[600]),
+                              headingTextStyle: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                              columns: [
+                                const DataColumn(label: Text('Rank')),
+                                const DataColumn(label: Text('Team')),
+                                DataColumn(
+                                  label: const Text('Wins'),
+                                  onSort: (index, _) =>
+                                      _sort((team) => team.wins, 'wins', index),
                                 ),
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            // Team Info
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    team['name'],
-                                    style: const TextStyle(
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  // Progress Bar
-                                  if (teams.isNotEmpty)
-                                    LinearProgressIndicator(
-                                      value: team['totalScore'] /
-                                          teams[0]['totalScore'],
-                                      backgroundColor: Colors.grey[200],
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                          isTopThree
-                                              ? [
-                                                  Colors.amber,
-                                                  Colors.grey[400]!,
-                                                  Colors.brown[300]!,
-                                                ][index]
-                                              : Colors.blue),
-                                    ),
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 16),
-                            // Score
-                            Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
-                              children: [
-                                Text(
-                                  '${team['totalScore']}',
-                                  style: const TextStyle(
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blue,
-                                  ),
+                                DataColumn(
+                                  label: const Text('Losses'),
+                                  onSort: (index, _) => _sort(
+                                      (team) => team.losses, 'losses', index),
                                 ),
-                                Text(
-                                  'points',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
-                                  ),
+                                DataColumn(
+                                  label: const Text('Score'),
+                                  onSort: (index, _) => _sort(
+                                      (team) => team.score, 'score', index),
+                                ),
+                                DataColumn(
+                                  label: const Text('Aggregate'),
+                                  onSort: (index, _) => _sort(
+                                      (team) => team.aggregateScore,
+                                      'aggregateScore',
+                                      index),
                                 ),
                               ],
+                              rows: teams.asMap().entries.map((entry) {
+                                final index = entry.key;
+                                final team = entry.value;
+                                return DataRow(
+                                  cells: [
+                                    DataCell(
+                                      Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          _buildRankIcon(index),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            '#${index + 1}',
+                                            style: const TextStyle(
+                                                fontWeight: FontWeight.bold),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    DataCell(Text(team.name)),
+                                    DataCell(
+                                      Text(
+                                        team.wins.toString(),
+                                        style: const TextStyle(
+                                          color: Colors.green,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    DataCell(
+                                      Text(
+                                        team.losses.toString(),
+                                        style: const TextStyle(
+                                          color: Colors.red,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                    DataCell(
+                                      Text(
+                                        team.score.toString(),
+                                        style: const TextStyle(
+                                            fontWeight: FontWeight.bold),
+                                      ),
+                                    ),
+                                    DataCell(
+                                        Text(team.aggregateScore.toString())),
+                                  ],
+                                );
+                              }).toList(),
                             ),
-                          ],
-                        ),
-                      ),
                     ),
-                  );
-                },
-              ),
+                  ),
+                ),
+              ],
             ),
+          ),
+        ),
+      ),
     );
   }
 }

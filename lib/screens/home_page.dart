@@ -98,7 +98,7 @@ class _HomePageState extends State<HomePage> with TickerProviderStateMixin {
     MenuOption(
       title: 'Leaderboard',
       icon: Icons.leaderboard,
-      route: '/leaderboard',
+      route: '/adminLeaderboard',
       color: Colors.green,
       description: 'Track tournament rankings',
     ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:tech_smash/screens/admin/adminLeaderboard.dart';
 import 'package:tech_smash/screens/admin/scoreCount.dart';
 import 'package:tech_smash/screens/auth/login.dart';
 import 'package:tech_smash/screens/user/matches.dart';
@@ -17,7 +18,6 @@ import 'config/firebase_options.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
@@ -46,6 +46,7 @@ class BadmintonEventApp extends StatelessWidget {
         '/schedule': (context) => const TournamentBracketPage(),
         '/score': (context) => const ScoreEntryPage(),
         '/leaderboard': (context) => const LeaderboardPage(),
+        '/adminLeaderboard': (context) => const AdminLeaderboardPage(),
         '/scoreCount': (context) => const CounterPage(),
         '/userpage': (context) => const UserPage(),
         '/teams': (context) => const TeamsPage(),
