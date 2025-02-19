@@ -62,13 +62,12 @@ class _ScoreEntryPageState extends State<ScoreEntryPage> {
         setState(() {
           currentMatchData = doc.data()!;
           isMatchComplete = currentMatchData['isComplete'] ?? false;
+
+          // Initialize scores if they exist
+          final sets = currentMatchData['sets'] as List<dynamic>;
           for (int i = 0; i < 5; i++) {
-            team1Controllers[i].text =
-                currentMatchData['set${i + 1}']?['team1Score']?.toString() ??
-                    '';
-            team2Controllers[i].text =
-                currentMatchData['set${i + 1}']?['team2Score']?.toString() ??
-                    '';
+            team1Controllers[i].text = sets[i]['team1Score']?.toString() ?? '';
+            team2Controllers[i].text = sets[i]['team2Score']?.toString() ?? '';
           }
         });
       }
@@ -80,14 +79,23 @@ class _ScoreEntryPageState extends State<ScoreEntryPage> {
   Future<void> updateMatchScore(String matchId) async {
     setState(() => isLoading = true);
     try {
-      Map<String, dynamic> matchData = {'isComplete': isMatchComplete};
+      // Get the current sets data
+      final sets = List.from(currentMatchData['sets']);
+
+      // Update scores while preserving player information
       for (int i = 0; i < 5; i++) {
-        matchData['set${i + 1}'] = {
+        sets[i] = {
+          ...sets[i],
           'team1Score': int.tryParse(team1Controllers[i].text) ?? 0,
           'team2Score': int.tryParse(team2Controllers[i].text) ?? 0,
         };
       }
-      await _firestore.collection('matches').doc(matchId).update(matchData);
+
+      await _firestore.collection('matches').doc(matchId).update({
+        'sets': sets,
+        'isComplete': isMatchComplete,
+      });
+
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Match scores updated successfully!')),
       );
@@ -102,6 +110,87 @@ class _ScoreEntryPageState extends State<ScoreEntryPage> {
     }
   }
 
+  Widget _buildSetCard(int setIndex) {
+    final set = currentMatchData['sets']?[setIndex] ?? {};
+    final team1Players = set['team1Players'] as List<dynamic>? ?? [];
+    final team2Players = set['team2Players'] as List<dynamic>? ?? [];
+
+    return Card(
+      elevation: 2,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Set ${setIndex + 1}',
+                style:
+                    const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: team1Controllers[setIndex],
+                        decoration: const InputDecoration(
+                          labelText: 'Team 1 Score',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Players: ${team1Players.join(" & ")}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      TextField(
+                        controller: team2Controllers[setIndex],
+                        decoration: const InputDecoration(
+                          labelText: 'Team 2 Score',
+                          border: OutlineInputBorder(),
+                        ),
+                        keyboardType: TextInputType.number,
+                        inputFormatters: [
+                          FilteringTextInputFormatter.digitsOnly
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Players: ${team2Players.join(" & ")}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -111,73 +200,57 @@ class _ScoreEntryPageState extends State<ScoreEntryPage> {
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  DropdownButtonFormField<String>(
-                    value: selectedMatchId,
-                    hint: const Text('Select a match'),
-                    items: matches
-                        .map((match) => DropdownMenuItem<String>(
-                              value: match['id'] as String,
-                              child: Text(
-                                  '${match['team1']} vs ${match['team2']}'),
-                            ))
-                        .toList(),
-                    onChanged: (value) {
-                      setState(() {
-                        selectedMatchId = value;
-                      });
-                      fetchMatchDetails(value!);
-                    },
-                  ),
-                  const SizedBox(height: 16),
-                  for (int i = 0; i < 5; i++)
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Set ${i + 1}',
-                            style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: TextField(
-                                controller: team1Controllers[i],
-                                decoration: const InputDecoration(
-                                    labelText: 'Team 1 Score'),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly
-                                ],
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: TextField(
-                                controller: team2Controllers[i],
-                                decoration: const InputDecoration(
-                                    labelText: 'Team 2 Score'),
-                                keyboardType: TextInputType.number,
-                                inputFormatters: [
-                                  FilteringTextInputFormatter.digitsOnly
-                                ],
-                              ),
-                            ),
-                          ],
+          : SingleChildScrollView(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: DropdownButtonFormField<String>(
+                          value: selectedMatchId,
+                          decoration: const InputDecoration(
+                            labelText: 'Select Match',
+                            border: OutlineInputBorder(),
+                          ),
+                          items: matches
+                              .map((match) => DropdownMenuItem<String>(
+                                    value: match['id'] as String,
+                                    child: Text(
+                                        '${match['team1']} vs ${match['team2']}'),
+                                  ))
+                              .toList(),
+                          onChanged: (value) {
+                            setState(() {
+                              selectedMatchId = value;
+                            });
+                            if (value != null) {
+                              fetchMatchDetails(value);
+                            }
+                          },
                         ),
-                      ],
+                      ),
                     ),
-                  ElevatedButton(
-                    onPressed: selectedMatchId == null
-                        ? null
-                        : () => updateMatchScore(selectedMatchId!),
-                    child: const Text('Update Match Scores'),
-                  ),
-                ],
+                    const SizedBox(height: 16),
+                    if (selectedMatchId != null) ...[
+                      for (int i = 0; i < 5; i++) _buildSetCard(i),
+                      const SizedBox(height: 16),
+                      ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          backgroundColor: Colors.purple,
+                        ),
+                        onPressed: () => updateMatchScore(selectedMatchId!),
+                        child: const Text(
+                          'Update Match Scores',
+                          style: TextStyle(fontSize: 16),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
     );

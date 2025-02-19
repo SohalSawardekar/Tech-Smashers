@@ -179,7 +179,7 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
           shape:
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
           title: Text(
-            'Add Player ${(currentTeam?.players.length ?? 0) + 1}/6',
+            'Add Player ${(currentTeam?.players.length ?? 0) + 1}/8',
             style: TextStyle(color: Colors.teal.shade700),
           ),
           content: SingleChildScrollView(
@@ -271,7 +271,7 @@ class _TeamRegistrationPageState extends State<TeamRegistrationPage>
                   ));
                   Navigator.pop(context);
                   playerNameController.dispose();
-                  if ((currentTeam?.players.length ?? 0) < 6) {
+                  if ((currentTeam?.players.length ?? 0) < 8) {
                     _showAddPlayerDialog();
                   } else {
                     Navigator.pop(context);

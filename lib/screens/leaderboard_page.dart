@@ -40,7 +40,7 @@ class LeaderboardPage extends StatefulWidget {
 
 class _LeaderboardPageState extends State<LeaderboardPage> {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  List<Team> teams = []; // Initialize list
+  List<Team> teams = [];
   String sortColumn = 'score';
   bool ascending = false;
 
@@ -61,10 +61,9 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
         // Sort: First by `score` (desc), then by `aggregateScore` (desc)
         teams.sort((a, b) {
           if (b.score != a.score) {
-            return b.score.compareTo(a.score); // Sort by score descending
+            return b.score.compareTo(a.score);
           }
-          return b.aggregateScore.compareTo(
-              a.aggregateScore); // Sort by aggregate score descending
+          return b.aggregateScore.compareTo(a.aggregateScore);
         });
       });
     } catch (e) {
@@ -135,105 +134,113 @@ class _LeaderboardPageState extends State<LeaderboardPage> {
                   ),
                 ),
                 const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: _fetchMatches,
+                  child: const Text("Refresh"),
+                ),
+                const SizedBox(height: 24),
                 Expanded(
                   child: Card(
                     elevation: 4,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
+                    // Wrap the table in nested scroll views
                     child: SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: teams.isEmpty
-                          ? const Center(
-                              child: Padding(
+                      scrollDirection: Axis.vertical,
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: teams.isEmpty
+                            ? const Padding(
                                 padding: EdgeInsets.all(20.0),
-                                child: CircularProgressIndicator(),
-                              ),
-                            )
-                          : DataTable(
-                              headingRowColor:
-                                  WidgetStateProperty.all(Colors.indigo[600]),
-                              headingTextStyle: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                              columns: [
-                                const DataColumn(label: Text('Rank')),
-                                const DataColumn(label: Text('Team')),
-                                DataColumn(
-                                  label: const Text('Wins'),
-                                  onSort: (index, _) =>
-                                      _sort((team) => team.wins, 'wins', index),
+                                child:
+                                    Center(child: CircularProgressIndicator()),
+                              )
+                            : DataTable(
+                                headingRowColor: MaterialStateProperty.all(
+                                    Colors.indigo[600]),
+                                headingTextStyle: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                DataColumn(
-                                  label: const Text('Losses'),
-                                  onSort: (index, _) => _sort(
-                                      (team) => team.losses, 'losses', index),
-                                ),
-                                DataColumn(
-                                  label: const Text('Score'),
-                                  onSort: (index, _) => _sort(
-                                      (team) => team.score, 'score', index),
-                                ),
-                                DataColumn(
-                                  label: const Text('Aggregate'),
-                                  onSort: (index, _) => _sort(
-                                      (team) => team.aggregateScore,
-                                      'aggregateScore',
-                                      index),
-                                ),
-                              ],
-                              rows: teams.asMap().entries.map((entry) {
-                                final index = entry.key;
-                                final team = entry.value;
-                                return DataRow(
-                                  cells: [
-                                    DataCell(
-                                      Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          _buildRankIcon(index),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            '#${index + 1}',
-                                            style: const TextStyle(
-                                                fontWeight: FontWeight.bold),
+                                columns: [
+                                  const DataColumn(label: Text('Rank')),
+                                  const DataColumn(label: Text('Team')),
+                                  DataColumn(
+                                    label: const Text('Wins'),
+                                    onSort: (index, _) => _sort(
+                                        (team) => team.wins, 'wins', index),
+                                  ),
+                                  DataColumn(
+                                    label: const Text('Losses'),
+                                    onSort: (index, _) => _sort(
+                                        (team) => team.losses, 'losses', index),
+                                  ),
+                                  DataColumn(
+                                    label: const Text('Score'),
+                                    onSort: (index, _) => _sort(
+                                        (team) => team.score, 'score', index),
+                                  ),
+                                  DataColumn(
+                                    label: const Text('Aggregate'),
+                                    onSort: (index, _) => _sort(
+                                        (team) => team.aggregateScore,
+                                        'aggregateScore',
+                                        index),
+                                  ),
+                                ],
+                                rows: teams.asMap().entries.map((entry) {
+                                  final index = entry.key;
+                                  final team = entry.value;
+                                  return DataRow(
+                                    cells: [
+                                      DataCell(
+                                        Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            _buildRankIcon(index),
+                                            const SizedBox(width: 8),
+                                            Text(
+                                              '#${index + 1}',
+                                              style: const TextStyle(
+                                                  fontWeight: FontWeight.bold),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      DataCell(Text(team.name)),
+                                      DataCell(
+                                        Text(
+                                          team.wins.toString(),
+                                          style: const TextStyle(
+                                            color: Colors.green,
+                                            fontWeight: FontWeight.bold,
                                           ),
-                                        ],
-                                      ),
-                                    ),
-                                    DataCell(Text(team.name)),
-                                    DataCell(
-                                      Text(
-                                        team.wins.toString(),
-                                        style: const TextStyle(
-                                          color: Colors.green,
-                                          fontWeight: FontWeight.bold,
                                         ),
                                       ),
-                                    ),
-                                    DataCell(
-                                      Text(
-                                        team.losses.toString(),
-                                        style: const TextStyle(
-                                          color: Colors.red,
-                                          fontWeight: FontWeight.bold,
+                                      DataCell(
+                                        Text(
+                                          team.losses.toString(),
+                                          style: const TextStyle(
+                                            color: Colors.red,
+                                            fontWeight: FontWeight.bold,
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                    DataCell(
-                                      Text(
-                                        team.score.toString(),
-                                        style: const TextStyle(
-                                            fontWeight: FontWeight.bold),
+                                      DataCell(
+                                        Text(
+                                          team.score.toString(),
+                                          style: const TextStyle(
+                                              fontWeight: FontWeight.bold),
+                                        ),
                                       ),
-                                    ),
-                                    DataCell(
-                                        Text(team.aggregateScore.toString())),
-                                  ],
-                                );
-                              }).toList(),
-                            ),
+                                      DataCell(
+                                          Text(team.aggregateScore.toString())),
+                                    ],
+                                  );
+                                }).toList(),
+                              ),
+                      ),
                     ),
                   ),
                 ),
